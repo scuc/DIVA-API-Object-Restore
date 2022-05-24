@@ -4,3 +4,5 @@
 *.ssh\id_rsa
 C:\Users\svc-ngdalet\.ssh\id_rsa
 config.yaml
+*.log
+*.pyc

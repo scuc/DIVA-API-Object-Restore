@@ -8,10 +8,10 @@ def get_config():
     """
     Setup configuration and credentials
     """
-    os.chdir("/Users/admin/Scripts/_Disney_DIVA_API_Object_Restore/")
-    path =  'config.yaml'
+    os.chdir("./")
+    path = "config.yaml"
 
-    with open(path, 'rt') as f:
+    with open(path, "rt") as f:
         config = yaml.safe_load(f.read())
 
     return config
@@ -28,5 +28,5 @@ def ensure_dirs():
     return
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     get_config()
