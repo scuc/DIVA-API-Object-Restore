@@ -1,6 +1,6 @@
 import logging
 import pprint
-import requests 
+import requests
 import time
 
 import config as cfg
@@ -9,8 +9,8 @@ import api_logger as log
 
 config = cfg.get_config()
 
-url_core_manager = config['urls']['core_manager_api']
-diva_source_dest = config['DIVA_Source_Dest']
+url_core_manager = config["urls"]["core_manager_api"]
+diva_source_dest = config["DIVA_Source_Dest"]
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 def api_call(url, params):
     token = auth.get_auth()
     headers = {
-            "Accept": "application/json",
-            "Authorization": token,
-        }
+        "Accept": "application/json",
+        "Authorization": token,
+    }
     r = requests.get(url, headers=headers, params=params, verify=False)
 
     return r
@@ -29,7 +29,7 @@ def api_call(url, params):
 def get_obj_info(objectName):
     """
     Returns the info for a given object in DIVAArchive.
-    Status Codes: 
+    Status Codes:
     200 = sucessful
     400 = Invalid object supplied
     401 = Unauthorized
@@ -73,24 +73,24 @@ def get_obj_info(objectName):
         statusCode = r.status_code
         diskInstances = response["diskInstances"]
 
-        if statusCode == 404: 
+        if statusCode == 404:
             collectionName = None
             instance = None
             # pprint(response)
 
-        elif statusCode == 200: 
-            collectionName = response['collectionName']
+        elif statusCode == 200:
+            collectionName = response["collectionName"]
 
-            if diskInstances == None: 
+            if diskInstances == None:
                 instance = None
             if len(diskInstances) >= 0:
-                instance = response['tapeInstances'][0]['id']
+                instance = response["tapeInstances"][0]["id"]
 
         else:
             collectionName = None
             instance = None
             # pprint(response)
-            
+
         # print("="*25)
         # print("STATUS CODE: " + str(statusCode))
         # print("COLLECTION NAME: " + str(collectionName))
@@ -101,16 +101,15 @@ def get_obj_info(objectName):
 
         return statusCode, collectionName, instance
 
-
     except Exception as e:
         api_exception_msg = f"EXCEPTION: {e}"
         logger.error(api_exception_msg)
-        collectionName=None
-        instance=None
+        collectionName = None
+        instance = None
         return statusCode, collectionName, instance
 
 
-def api_obj_restore(objectName, collectionName, instance):
+def post_restore_request(objectName, collectionName, instance):
     """
     Requests an object restore from DIVAArchive.
     """
@@ -127,16 +126,13 @@ def api_obj_restore(objectName, collectionName, instance):
             "objectName": objectName,
             "options": " ",
             "priority": 70,
-            "qos": 0
+            "qos": 0,
         }
 
         headers = {
             "Accept": "application/json",
             "Authorization": token,
         }
-
-        db_check_msg = f"Checking DIVA DB for object name:  {objectName}"
-        logger.info(db_check_msg)
 
         r = requests.post(url, headers=headers, json=data, verify=False)
 
@@ -147,10 +143,10 @@ def api_obj_restore(objectName, collectionName, instance):
         # print("="*25)
 
         response = r.json()
-        response_str = pprint.pprint(response)
-        # print(response_str)
 
-        code = r.status_code
+        # response_str = pprint.pprint(response)
+        # print(response_str)
+        # code = r.status_code
 
         logger.info(response)
 
@@ -166,9 +162,9 @@ def api_obj_restore(objectName, collectionName, instance):
         return "error"
 
 
-def api_status_request(objectName, requestID):
+def get_restore_status(objectName, requestID):
     """
-    Returns the restore status for the requested object, untitl the job completes or fails. 
+    Returns the restore status for the requested object, untitl the job completes or fails.
     Status Codes:
     200 = Sucessful
     400 = Invalid ID supplied
@@ -177,105 +173,56 @@ def api_status_request(objectName, requestID):
     404 = Request not found
     """
 
-    count = 0
+    try:
+        token = auth.get_auth()
+        url_object_byobjectName = f"https://{url_core_manager}/requests/{requestID}"
 
-    while True: 
-        try:
-            token = auth.get_auth()
-            url_object_byobjectName = f"https://{url_core_manager}/requests/{requestID}"
+        params = {}
 
-            params = {}
+        headers = {
+            "Accept": "application/json",
+            "Authorization": token,
+        }
 
-            headers = {
-                "Accept": "application/json",
-                "Authorization": token,
-            }
+        db_check_msg = f"Checking restore status for:  {objectName}"
+        logger.info(db_check_msg)
 
-            db_check_msg = f"Checking restore status for:  {objectName}"
-            logger.info(db_check_msg)
+        r = requests.get(
+            url_object_byobjectName, headers=headers, params=params, verify=False
+        )
 
-            r = requests.get(url_object_byobjectName,
-                            headers=headers, params=params, verify=False)
+        response = r.json()
+        code = r.status_code
 
-            response = r.json()
-            code = r.status_code
+        if code == 200:
 
             jobStatus = {
-                    "stateCode":response['stateCode'],
-                    "progress":response['progress'],
-                    "stateDescription": response['stateDescription'],
-                    "stateName": response['stateName'],
-                    "statusCode": response['statusCode'],
-                    "statusDescription": response['statusDescription'],
-                    "progress": response['progress']
-                    }
+                "stateCode": response["stateCode"],
+                "progress": response["progress"],
+                "stateDescription": response["stateDescription"],
+                "stateName": response["stateName"],
+                "statusCode": response["statusCode"],
+                "statusDescription": response["statusDescription"],
+                "progress": response["progress"],
+            }
 
-            # print(jobStatus)
+            logger.info(jobStatus)
+            return jobStatus
 
-            if code == 200: 
-                # print("RESPONSE:")
-                # pprint.pprint(response)
+        else:
+            logger.error(f"unable to obtain jobstatus - status_code = {code}")
+            jobStatus = None
+            return jobStatus
 
-                stateCode, progress, stateDescription, stateName, statusCode, statusDescription = jobStatus.values()
-
-                # print("="*30)
-                # print(f"StateCode: {stateCode}")
-                # print(f"Progress: {progress}")
-                # print(f"State Description: {stateDescription}")
-                # print(f"stateName: {stateName}")
-                # print(f"statusCode: {statusCode}")
-                # print(f"statusDescription: {statusDescription}")
-                # print("="*30)
-
-                if (
-                    progress < 100 and
-                    statusCode == 1000 and 
-                    statusDescription == 'success' and
-                    count <= 100
-                    ):
-                    log.request_status(**jobStatus)
-                    logger.info("PAUSE script for 300sec and check again")
-                    time.sleep(300)
-                    count += 1   
-
-                if (
-                    progress == 100 and 
-                    stateDescription == 'Completed' and
-                    stateName == 'DIVA_COMPLETED' and
-                    statusCode == 1000 and 
-                    statusDescription == 'success'
-                    ):
-                    log.request_status(**jobStatus)
-                    return jobStatus
-
-                if (
-                    stateDescription == 'Cancelled'
-                    or progress < 0 
-                    ):
-                    logger.info("Restore job ended before the transfer completed.")
-                    return jobStatus
-                    
-                if count > 100: 
-                    logger.info("Restore object taking too long - over 8 hours - exiting script.")    
-                    log.request_status(**jobStatus)
-                    return jobStatus   
+    except Exception as e:
+        logger.error(f"Exception on RequestId:{requestID} \n {e}")
+        return
 
 
-            else:
-                logger.info("Job Status returned code that was not 200")  
-                return jobStatus                 
-
-        except Exception as e:
-            api_exception_msg = f"EXCEPTION: {e}"
-            logger.error(api_exception_msg)
-            return
-
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     get_obj_info(objectName="40A8F02A4440-8000FFFF-FFFF-B73F-D816")
-    # api_status_request(objectName="40A8F02A4440-8000FFFF-FFFF-EF92-7898", requestID="255671")
+    # get_restore_status(objectName="40A8F02A4440-8000FFFF-FFFF-EF92-7898", requestID="255671")
     # api_obj_check(
-        #     objectName="FC15B4F7AB88-8000FFFF-FFFF-F62C-5866")
-        # api_obj_restore(
-        #     objectName="FC15B4F7AB88-8000FFFF-FFFF-F62C-5866")
+    #     objectName="FC15B4F7AB88-8000FFFF-FFFF-F62C-5866")
+    # post_restore_request(
+    #     objectName="FC15B4F7AB88-8000FFFF-FFFF-F62C-5866")

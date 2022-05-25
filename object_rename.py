@@ -1,12 +1,11 @@
 import logging
 import logging.config
 import os
-import sys
 
 from pathlib import Path
 
 import config
-import permissions_fix as permissions
+
 
 config = config.get_config()
 restore_dir = config["paths"]["restore_dir"]

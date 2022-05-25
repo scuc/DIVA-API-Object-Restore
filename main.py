@@ -5,16 +5,18 @@ import logging
 import logging.config
 import os
 import shutil
-import sys
+
+import time
 import yaml
 
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from time import localtime, strftime
 
 import config
 import api_DIVA as api
-import object_rename as obj
+import object_rename as rename
+import object_restore as restore
 
 config = config.get_config()
 
@@ -59,10 +61,7 @@ def set_logger():
 def main():
 
     """
-    This script will restore object from DIVAArchive. The script is trigged from an external workflow from the Dalet Galazy BPM.
-    The workflow from Dalet provides the ObjectName, FileName, and Folderpath information stored in DIVA. It uses DIVA's REST api to
-    chedk the object info, and initiate a restore. Once the restore is started it will periodically check the status of the restore
-    job until the object is completely restored. From there it moves the object to a watch folder, and adds the appropraite
+    This script will restore object from DIVAArchive. The script is trigged from an external workflow from the Dalet Galazy BPM. The workflow from Dalet provides the ObjectName, FileName, and Folderpath information stored in DIVA. It uses DIVA's REST api to chedk the object info, and initiate a restore. Once the restore is started it will periodically check the status of the restore job until the object is completely restored. From there it moves the object to a watch folder, and adds the appropraite
     file extension.
     """
 
@@ -75,13 +74,14 @@ def main():
     ]
 
     if len(csv_list) != 0:
+        csv_row_list = []
 
         for csvfile in csv_list:
             csvfile_path = Path(csv_watchfolder, csvfile)
             with open(csvfile_path) as csvfile:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
-                    print(row)
+
                     objectName = row["objectName"]
                     fileName = row["fileName"]
                     folderPath = row["folderPath"]
@@ -96,45 +96,53 @@ def main():
                     "
 
                     logger.info(start_msg)
-
+            csv_row_list.append(row)
             shutil.move(csvfile_path, Path(csv_watchfolder, "_DONE"))
 
     else:
-        logger.info(date_start)
         return
 
-    # except Exception as e:
-    #     logger.error(f"Error - Missing required variables.")
-    #     logger.error(e)
-    #     complete_message(objectName, fileName)
-    #     return
+    # for row in csv_row_list:
+    #     for key, value in row.items():
+    #         print(key, value)
 
-    statusCode, collectionName, instance = api.get_obj_info(objectName)
+    submitted_csv_list = restore.submit_restore_req(csv_row_list)
 
-    if statusCode == 200:
-        restore_statusCode, requestId, statusDescription = api.api_obj_restore(
-            objectName, collectionName, instance
-        )
+    count = 0
 
-        if restore_statusCode == 1000 and statusDescription == "success":
+    while count < 50:
 
-            jobStatus = api.api_status_request(objectName, requestId)
+        for object in submitted_csv_list:
+            objectName = object["objectName"]
+            requestId = object["requestId"]
+            jobStatus = api.get_restore_status(objectName, requestId)
 
-            if (
-                jobStatus["progress"] == 100
-                and jobStatus["statusDescription"] == "success"
-            ):
-                obj.obj_rename(fileName, objectName, folderPath)
+            if jobStatus is not None:
+                job_complete = restore.evaluate_restore_status(jobStatus)
+
+                if job_complete is True:
+                    rename.obj_rename(
+                        object["fileName"], object["objectName"], object["folderPath"]
+                    )
+                    complete_message(objectName, fileName)
+                    submitted_csv_list.remove(object)
+                else:
+                    logger.info(f"Restore still processing for: {fileName}")
             else:
-                logger.info(f"Object restore incomplete.")
+                logger.error(
+                    f"jobStatus for {objectName} returned None. removing from list"
+                )
+                submitted_csv_list.remove(object)
 
-        else:
-            restore_msg = f"Restore Status = {restore_statusCode}, RestoreDescription = {statusDescription}\n exiting restore"
+        count += 1
+        logger.info(f"Checking restore status again in 5min")
+        time.sleep(300)
 
-    else:
-        logger.info(f"statusCode: {statusCode} - unable to locate object in DIVA")
-
-    complete_message(objectName, fileName)
+    if count > 50:
+        logger.info(
+            "Restore taking too long (over 4 hours), exiting script. \n Remaining objects: {submitted_csv_list}"
+        )
+        return
 
 
 def complete_message(objectName, fileName):
