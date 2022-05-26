@@ -15,7 +15,7 @@ from time import localtime, strftime
 
 import config
 import api_DIVA as api
-import object_rename as rename
+import rename_object as rename
 import object_restore as restore
 
 config = config.get_config()
@@ -32,7 +32,7 @@ def set_logger():
     """
     Setup logging configuration
     """
-    path = "./logging.yaml"
+    path = "/Users/admin/Scripts/DIVA-API-Object-Restore-WF/logging.yaml"
 
     with open(path, "rt") as f:
         config = yaml.safe_load(f.read())
@@ -74,6 +74,7 @@ def main():
     ]
 
     if len(csv_list) != 0:
+        set_logger()
         csv_row_list = []
 
         for csvfile in csv_list:
@@ -97,7 +98,12 @@ def main():
 
                     logger.info(start_msg)
             csv_row_list.append(row)
-            shutil.move(csvfile_path, Path(csv_watchfolder, "_DONE"))
+
+            source_path = csvfile_path
+            dest_path = Path(csv_watchfolder, "_DONE")
+            rename.move_object(source_path, dest_path)
+
+            return
 
     else:
         return
@@ -121,13 +127,22 @@ def main():
                 job_complete = restore.evaluate_restore_status(jobStatus)
 
                 if job_complete is True:
-                    rename.obj_rename(
+                    rename.rename_object(
                         object["fileName"], object["objectName"], object["folderPath"]
                     )
                     complete_message(objectName, fileName)
                     submitted_csv_list.remove(object)
+                    if len(submitted_csv_list) == 0:
+                        complete_msg = f"\n\
+                         ==============================================\n\
+                                        Script Complete\n\
+                         ==============================================\n"
+                        logger.info(complete_msg)
+
                 else:
                     logger.info(f"Restore still processing for: {fileName}")
+                    logger.info(f"Checking restore status again in 5min")
+                    time.sleep(300)
             else:
                 logger.error(
                     f"jobStatus for {objectName} returned None. removing from list"
@@ -135,8 +150,6 @@ def main():
                 submitted_csv_list.remove(object)
 
         count += 1
-        logger.info(f"Checking restore status again in 5min")
-        time.sleep(300)
 
     if count > 50:
         logger.info(
@@ -160,7 +173,6 @@ def complete_message(objectName, fileName):
 
 
 if __name__ == "__main__":
-    set_logger()
     main()
     # main(args=[
     #             "FC15B4F7AB88-80001000-0000-4088-AD86",

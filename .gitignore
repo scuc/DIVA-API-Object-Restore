@@ -6,3 +6,5 @@ C:\Users\svc-ngdalet\.ssh\id_rsa
 config.yaml
 *.log
 *.pyc
+*.csv_1
+*.csv
