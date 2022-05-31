@@ -8,6 +8,10 @@ logger = logging.getLogger(__name__)
 
 
 def submit_restore_req(csv_row_list):
+    """
+    Iterate over a list of csv files, use the rows in each csv as the metadata to submit a media
+    restore request from DIVA. 
+    """
     submitted_csv_list = []
 
     for csv_row in csv_row_list:
@@ -49,6 +53,9 @@ def submit_restore_req(csv_row_list):
 
 
 def evaluate_restore_status(jobStatus):
+    """
+    Check the status of an existing restore request. 
+    """
 
     (
         stateCode,
