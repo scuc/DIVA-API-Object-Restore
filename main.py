@@ -56,21 +56,42 @@ def set_logger():
     return logger
 
 
+def daily_cleanup(date_start):
+    timenow = time.localtime()
+
+    if timenow.tm_hour == 1 and timenow.tm_min == 1:
+        set_logger()
+        start_cleanup_msg = f"\n\
+        ================================================================\n\
+            Start CSV CleanUp\n\
+            StartTime: {date_start}\n\
+        ================================================================\n\
+        "
+        logger.info(start_cleanup_msg)
+        cleanup.csv_cleanup()
+        end_cleanup_msg = f"\n\
+        ================================================================\n\
+            End CSV CleanUp\n\
+        ================================================================\n\
+        "
+        logger.info(end_cleanup_msg)
+    else:
+        return
+
+    return
+
+
 def main():
 
     """
-    This script will restore object from DIVAArchive. The script is trigged from an external workflow from the Dalet Galazy BPM. The workflow from Dalet provides the ObjectName, FileName, and Folderpath information stored in DIVA. It uses DIVA's REST api to chedk the object info, and initiate a restore. Once the restore is started it will periodically check the status of the restore job until the object is completely restored. From there it moves the object to a watch folder, and adds the appropraite
+    This script will restore object from DIVAArchive. The script is trigged from an external workflow from the Dalet Galazy BPM. The workflow from Dalet provides the ObjectName, FileName, and Folderpath information stored in DIVA. It uses DIVA's REST api to chedk the object info, and initiate a restore. Once the restore is started it will periodically check the status of the restore job until the object is completely restored. From there it moves the object to a watch folder, and adds the appropriate
     file extension.
     """
 
     date_start = str(strftime("%A, %d. %B %Y %I:%M%p", localtime()))
     timenow = time.localtime()
 
-    if timenow.tm_hour < 1 and time.tm_min < 5:
-        set_logger()
-        cleanup.csv_cleanup()
-    else:
-        logger.info("Not time for CSV cleanup")
+    daily_cleanup()
 
     csv_list = [
         x
