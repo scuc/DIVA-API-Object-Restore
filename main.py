@@ -4,7 +4,6 @@ import csv
 import logging
 import logging.config
 import os
-import shutil
 
 import time
 import yaml
@@ -15,14 +14,13 @@ from time import localtime, strftime
 
 import config
 import api_DIVA as api
-import rename_object as rename
+import csv_cleanup as cleanup
+import object_rename as rename
 import object_restore as restore
 
 config = config.get_config()
 
-
-# script_root = config["paths"]["script_root"]
-csv_watchfolder = config["paths"]["csv_watch_folder"]
+csv_watchfolder = config["paths"]["csv_watch_dir"]
 
 
 logger = logging.getLogger(__name__)
@@ -66,6 +64,13 @@ def main():
     """
 
     date_start = str(strftime("%A, %d. %B %Y %I:%M%p", localtime()))
+    timenow = time.localtime()
+
+    if timenow.tm_hour < 1 and time.tm_min < 5:
+        set_logger()
+        cleanup.csv_cleanup()
+    else:
+        logger.info("Not time for CSV cleanup")
 
     csv_list = [
         x
@@ -102,8 +107,6 @@ def main():
             source_path = csvfile_path
             dest_path = Path(csv_watchfolder, "_DONE")
             rename.move_object(source_path, dest_path)
-
-            return
 
     else:
         return
