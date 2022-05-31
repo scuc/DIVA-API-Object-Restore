@@ -24,56 +24,55 @@ def csv_cleanup():
     Pass the list of log files to the 'zip_logs' function and create a zip archive.
     """
 
-    logger.info(f"Begin CSV cleanup, checking for csv files in:  {csv_done_dir}")
     os.chdir(csv_done_dir)
 
     csv_list = get_csv()
-    
-    
+
     if csv_list == []:
         return
     else:
         try:
+            logger.info(f"CSV files for archive: {csv_list}")
             compression = zipfile.ZIP_DEFLATED
             yesterday = datetime.today() - timedelta(1)
 
-            csv_zip_filename = f"{strftime("%Y-%m", yesterday.timetuple())}_csv.zip"
-            logger.info(f"zip filename: {csv_zip_filename}")
-            
+            csv_zip_filename = f"{strftime('%Y-%m', yesterday.timetuple())}_csv.zip"
+
+            zippath = Path(csv_done_dir, csv_zip_filename)
+
             for csvfile in csv_list:
-        
-                zippath = Path(csv_done_dir, csv_zip_filename)
+                with zipfile.ZipFile(
+                    zippath, mode="a", compression=compression
+                ) as zipObj:
 
+                    archive_source = Path(csv_done_dir, csvfile)
 
-                with zipfile.ZipFile(zippath, mode='a', compression=compression) as zipObj:
-
-                    zipObj.write(Path(csv_done_dir, csvfile))
+                    zipObj.write(archive_source.name)
                     zipObj.close()
-                    
-                    logger.info(f"{csvfile} was written to zip:  {csv_zip_filename}")
 
-                    
-                    archive = zipfile.ZipFile(zippath, mode='r')
+                    logger.info(f"{csvfile} written to zip:  {csv_zip_filename}")
+
+                    archive = zipfile.ZipFile(zippath, mode="r")
                     test_result = archive.testzip()
 
-                    if test_result == None: 
-                        logger.info(f"{csv_zip_filename} test sucessful.")
-                        logger.info(f"Archived csv: {csvfile}")
+                    if test_result == None:
+                        logger.info(f"Zip test sucessful")
+                        logger.info(f"CSV Archived")
                         delete_csv(csvfile)
-                        return
-                    else: 
+                    else:
                         zip_fail_msg = f"Failed to zip {csvfile} in archive: {csv_zip_filename}. \n test results: {test_result}"
                         logger.info(zip_fail_msg)
-                        return 
 
-        except zipfile.BadZipfile as error: 
+            return
+
+        except zipfile.BadZipfile as error:
             logger.error(error)
             return
 
 
 def get_csv():
     """
-    Get a list of the CSV files needed for ZIP archive. CSV file ext may be appended with numbers, 
+    Get a list of the CSV files needed for ZIP archive. CSV file ext may be appended with numbers,
     so list comp can't just check for files that endwith(".csv")
     """
 
@@ -93,14 +92,15 @@ def get_csv():
 
 def delete_csv(csvfile):
     """
-    Delete a give csv file. 
+    Delete a given csv file.
     """
 
     logpath = Path(csv_done_dir, csvfile)
     logpath.unlink()
     logger.info(f"CSV deleted: {csvfile}")
 
-    return 
+    return
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     csv_cleanup()
